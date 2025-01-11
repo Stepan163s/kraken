@@ -22,19 +22,37 @@ def get_week_start(date=None):
         date = datetime.now()
     return (date - timedelta(days=date.weekday())).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
 
-def save_message(chat_id, user_id, message_text):
+def save_message(chat_id, user_id, message):
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Получение имени из Telegram
+    # Получение информации о текущем пользователе из Telegram
     user_info = bot.get_chat_member(chat_id, user_id)
-    telegram_name = user_info.user.first_name
+    full_name = f"{user_info.user.first_name} {user_info.user.last_name or ''}".strip()
+    username = f"@{user_info.user.username}" if user_info.user.username else "unknown_user"
 
-    # Записываем сообщение в таблицу с Telegram-именем
+    # Текущее время
+    timestamp = datetime.now().strftime('%Y-%m-%d|%H:%M')
+
+    # Определяем тип взаимодействия
+    if message.reply_to_message:  # Если это ответ на сообщение
+        replied_user_info = bot.get_chat_member(chat_id, message.reply_to_message.from_user.id)
+        replied_full_name = f"{replied_user_info.user.first_name} {replied_user_info.user.last_name or ''}".strip()
+        interaction_type = f"responds user {replied_full_name}"
+    else:  # Обычное сообщение
+        interaction_type = "message"
+
+    # Формируем текст сообщения в нужном формате
+    formatted_text = f"{full_name}: {message.text}"
+
+    # Формируем итоговый текст записи
+    formatted_message = f"{timestamp}|{username}|{interaction_type}|{formatted_text}"
+
+    # Записываем данные в базу
     cur.execute("""
-        INSERT INTO messages (chat_id, user_id, telegram_name, message_text, message_date)
+        INSERT INTO messages (timestamp, username, interaction_type, full_name, message_text)
         VALUES (%s, %s, %s, %s, %s)
-    """, (chat_id, user_id, telegram_name, message_text, datetime.now()))
+    """, (timestamp, username, interaction_type, full_name, formatted_text))
 
     conn.commit()
     cur.close()
@@ -290,7 +308,7 @@ def get_weekly_topic(chat_id):
     keywords = extract_keywords(messages)
 
     # Выводим в консоль
-    
+
     bot.send_message(chat_id, text = f"Тема недели: {', '.join(keywords[:3])}")
 
 import csv
