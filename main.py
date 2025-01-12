@@ -42,8 +42,8 @@ def save_message(chat_id, user_id, message):
     else:  # Обычное сообщение
         interaction_type = "message"
 
-    # Формируем текст сообщения в нужном формате
-    formatted_text = f"{full_name}: {message.text}"
+    # Формируем текст сообщения в одну строку
+    formatted_text = " ".join(f"{full_name}: {message.text}".split())
 
     # Формируем итоговый текст записи
     formatted_message = f"{timestamp}|{username}|{interaction_type}|{formatted_text}"
@@ -323,9 +323,9 @@ def export_and_send_weekly_messages_txt(chat_id, output_file="weekly_messages.tx
 
     # Извлекаем сообщения за неделю
     cur.execute("""
-        SELECT m.user_id, m.telegram_name, m.message_text, m.message_date
-        FROM messages m
-        WHERE m.chat_id = %s AND m.message_date >= %s
+        SELECT timestamp, username, interaction_type, message_text
+        FROM messages
+        WHERE chat_id = %s AND message_date >= %s
     """, (chat_id, week_start))
     messages = cur.fetchall()
 
@@ -336,14 +336,14 @@ def export_and_send_weekly_messages_txt(chat_id, output_file="weekly_messages.tx
         bot.send_message(chat_id, "Нет сообщений за текущую неделю.")
         return
 
-    # Создаем TXT файл
+    # Создаем TXT файл с нужным форматом
     with open(output_file, "w", encoding="utf-8") as f:
-        f.write("User ID | Telegram Name | Message Text | Timestamp\n")
-        f.write("-" * 60 + "\n")  # Разделительная линия
-        for user_id, telegram_name, message_text, message_date in messages:
-            formatted_date = message_date.strftime('%Y-%m-%d %H:%M')  # Форматируем дату и время
-            # Формируем строку данных
-            f.write(f"{user_id} | {telegram_name} | {message_text} | {formatted_date}\n")
+        for timestamp, username, interaction_type, message_text in messages:
+            # Убираем лишние пробелы в тексте сообщения
+            formatted_text = " ".join(message_text.split())
+            # Формируем строку в нужном формате
+            formatted_row = f"{timestamp}|{username}|{interaction_type}|{formatted_text}\n"
+            f.write(formatted_row)
 
     # Отправляем TXT файл в Telegram-чат
     with open(output_file, "rb") as f:
