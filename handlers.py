@@ -27,17 +27,28 @@ def handle_message(message):
     user_id = message.from_user.id
     save_message(bot, chat_id, user_id, message)
 
+
+def get_participants_count(chat_id):
+    return bot.get_chat_member_count(chat_id)
+
+
+
+
 def format_statistics(chat_id):
     message_stats = get_message_statistics(chat_id)
     meme_stats = get_meme_statistics(chat_id)
     general_stats = get_general_statistics(chat_id)
-
-    # Форматирование статистики
-    messages_formatted = (
-        f"💬 Сообщений: {message_stats['current_message_count'] // 1000}."
-        f"{(message_stats['current_message_count'] % 1000) // 100}к "
-        f"({message_stats['current_message_count'] - message_stats['previous_message_count']:+})"
-    )
+    if message_stats['current_message_count'] < 1000:
+        messages_formatted = (
+            f"💬 Сообщений: {message_stats['current_message_count']} "
+            f"({message_stats['current_message_count'] - message_stats['previous_message_count']:+})"
+        )
+    else:
+        messages_formatted = (
+            f"💬 Сообщений: {message_stats['current_message_count'] // 1000}."
+            f"{(message_stats['current_message_count'] % 1000) // 100}к "
+            f"({message_stats['current_message_count'] - message_stats['previous_message_count']:+})"
+        )
     users_formatted = (
         f"👀 Участники дискуссий: {message_stats['current_unique_users']} "
         f"({message_stats['current_unique_users'] - message_stats['previous_unique_users']:+})"
@@ -72,3 +83,5 @@ def format_statistics(chat_id):
     )
 
     return f"```\n{response}\n```"  # Форматирование в стиле Telegram
+
+
