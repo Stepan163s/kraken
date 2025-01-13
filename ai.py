@@ -1,6 +1,6 @@
 import os
 import openai
-import sqlite3
+import postgresql
 from datetime import datetime, timedelta
 from telebot import TeleBot
 from dotenv import load_dotenv
