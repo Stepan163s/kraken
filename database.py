@@ -77,13 +77,11 @@ def save_participants_count(chat_id, participants_count):
     cur = conn.cursor()
 
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
     # Вставляем количество участников в базу данных
     cur.execute("""
         INSERT INTO participants_statistics (chat_id, participants_count, timestamp)
         VALUES (%s, %s, %s)
     """, (chat_id, participants_count, timestamp))
-
     conn.commit()
     cur.close()
     conn.close()
@@ -125,37 +123,6 @@ def get_message_statistics(chat_id):
 
 
 
-
-
-
-def get_general_statistics(chat_id):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    current_week_start = get_week_start()
-    previous_week_start = get_week_start(current_week_start - timedelta(days=7))
-    cur.execute("""
-        SELECT participants, stories
-        FROM general_statistics
-        WHERE chat_id = %s AND week_start = %s
-    """, (chat_id, current_week_start))
-    current_general_stats = cur.fetchone() or (0, 0)
-    cur.execute("""
-        SELECT participants, stories
-        FROM general_statistics
-        WHERE chat_id = %s AND week_start = %s
-    """, (chat_id, previous_week_start))
-    previous_general_stats = cur.fetchone() or (0, 0)
-    cur.close()
-    conn.close()
-    return {
-        "current_participants": current_general_stats[0],
-        "current_stories": current_general_stats[1],
-        "previous_participants": previous_general_stats[0],
-        "previous_stories": previous_general_stats[1],
-    }
-
-
-
 def get_general_statistics(chat_id):
     conn = get_db_connection()
     cur = conn.cursor()
@@ -192,3 +159,25 @@ def get_meme_statistics(chat_id):
         "previous_memes_published": 100,
         "previous_memes_deleted": 30,
     }
+
+
+def get_weekly_messages(chat_id):
+    """Получает сообщения за текущую неделю."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Получаем начало текущей недели
+    week_start = get_week_start()
+
+    # Извлекаем данные за текущую неделю
+    cur.execute("""
+        SELECT timestamp, username, interaction_type, full_name, message_text, user_id
+        FROM messages
+        WHERE chat_id = %s AND timestamp >= %s
+    """, (chat_id, week_start))
+    weekly_messages = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return weekly_messages
