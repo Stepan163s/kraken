@@ -52,16 +52,30 @@ def save_message(bot: TeleBot, chat_id, user_id, message):
     conn.close()
 
 
+def get_full_context(limit=1500):
+    query = """
+    SELECT timestamp, username, content
+    FROM messages
+    ORDER BY timestamp DESC
+    LIMIT ?
+    """
+    conn = sqlite3.connect("kraken.db")
+    cursor = conn.cursor()
+    cursor.execute(query, (limit,))
+    results = cursor.fetchall()
+    conn.close()
 
+    # Возвращаем сообщения в обратном порядке для хронологии
+    return results[::-1]
 
 
 def save_participants_count(chat_id, participants_count):
     # Получаем количество участников чата через API TeleBot
 
-    
+
     conn = get_db_connection()
     cur = conn.cursor()
-    
+
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     # Вставляем количество участников в базу данных
@@ -81,7 +95,7 @@ def get_message_statistics(chat_id):
     cur = conn.cursor()
     current_week_start = get_week_start()
     previous_week_start = get_week_start(current_week_start - timedelta(days=7))
-    
+
     # Запрос на текущую неделю
     cur.execute("""
         SELECT COUNT(*), COUNT(DISTINCT user_id)
@@ -89,7 +103,7 @@ def get_message_statistics(chat_id):
         WHERE chat_id = %s AND timestamp >= %s AND timestamp < %s
     """, (chat_id, current_week_start, current_week_start + timedelta(weeks=1)))
     current_message_count, current_unique_users = cur.fetchone() or (0, 0)
-    
+
     # Запрос на предыдущую неделю
     cur.execute("""
         SELECT COUNT(*), COUNT(DISTINCT user_id)
@@ -97,11 +111,11 @@ def get_message_statistics(chat_id):
         WHERE chat_id = %s AND timestamp >= %s AND timestamp < %s
     """, (chat_id, previous_week_start, current_week_start))
     previous_message_count, previous_unique_users = cur.fetchone() or (0, 0)
-    
+
     # Закрытие соединения
     cur.close()
     conn.close()
-    
+
     return {
         "current_message_count": current_message_count,
         "current_unique_users": current_unique_users,
@@ -171,10 +185,10 @@ def get_general_statistics(chat_id):
 
 def get_meme_statistics(chat_id):
     return {
-        "current_total_memes_sent": 100, 
-        "current_memes_published": 80,   
-        "current_memes_deleted": 20,     
+        "current_total_memes_sent": 100,
+        "current_memes_published": 80,
+        "current_memes_deleted": 20,
         "previous_total_memes_sent": 120,
-        "previous_memes_published": 100,  
-        "previous_memes_deleted": 30,    
+        "previous_memes_published": 100,
+        "previous_memes_deleted": 30,
     }

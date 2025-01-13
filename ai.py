@@ -1,5 +1,7 @@
 import os
 import openai
+import sqlite3
+from datetime import datetime, timedelta
 from telebot import TeleBot
 from dotenv import load_dotenv
 
@@ -29,40 +31,67 @@ STYLE_PROMPT = (
     - Если ты совсем не знаешь правильный ответ, очень в крайних случаях спроси пользователя "Гига". Он очень боится острых вопросов, как, например, политика, так что формируй аккуратно."""
 )
 
+# Извлекает последние сообщения из базы для формирования контекста.
+def get_context_from_db(limit=500, hours=24):
+    query = """
+    SELECT timestamp, username, content
+    FROM messages
+    WHERE timestamp >= ?
+    ORDER BY timestamp DESC
+    LIMIT ?
+    """
+    time_threshold = datetime.now() - timedelta(hours=hours)
+
+    conn = sqlite3.connect("kraken.db")
+    cursor = conn.cursor()
+    cursor.execute(query, (time_threshold, limit))
+    results = cursor.fetchall()
+    conn.close()
+
+    return [
+        f"[{timestamp}] {username}: {content}"
+        for timestamp, username, content in results
+    ][::-1]  # Возвращаем в хронологическом порядке
+
 # Обработчик команды /start
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     bot.reply_to(message, "привет! я кракен. задай мне вопрос, начав с 'кракен,'")
 
 # Обработчик текстовых сообщений
-@bot.message_handler(func=lambda message: message.text.lower().startswith("кракен"))
+@bot.message_handler(func=lambda message: message.text.lower().startswith("кракен", "?"))
 def handle_message(message):
-    # Извлечение имени пользователя
     username = message.from_user.first_name or message.from_user.username or "Друг"
-    
-    # Извлечение текста вопроса
-    user_question = message.text[7:].strip()  # Текст после "кракен,"
+    user_question = message.text[7:].strip()
 
-    # Создание полного промпта с учетом имени пользователя
-    full_prompt = f"{STYLE_PROMPT}\n\nЗовут его {username}. Вот его вопрос:\n{user_question}"
+    # Извлекаем контекст из базы
+    context = get_context_from_db(limit=20)
 
-    # Запрос к OpenAI API
+    # Формируем полный промпт
+    full_prompt = f"""
+    {STYLE_PROMPT}
+
+    Контекст предыдущих сообщений:
+    {'\n'.join(context)}
+
+    Зовут его {username}. Вот его вопрос:
+    {user_question}
+    """
+
+    # Запрос в OpenAI API
     response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",  # Используем актуальную модель
+        model="gpt-4o-mini",
         messages=[
             {"role": "user", "content": full_prompt},
         ],
-        max_tokens=500,      # Максимальное количество токенов в ответе
-        temperature=0.7,     # Температура генерации (от 0 до 1)
-        top_p=1,             # Параметр nucleus sampling
-        frequency_penalty=0, # Штраф за частоту
-        presence_penalty=0,  # Штраф за присутствие
+        max_tokens=500,
+        temperature=0.7,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0,
     )
 
-    # Получение ответа от модели
-    bot_reply = response.choices[0].message['content'].strip()
-
-    # Отправка ответа пользователю
+    bot_reply = response['choices'][0]['message']['content'].strip()
     bot.reply_to(message, bot_reply)
 
 # Запуск бота
