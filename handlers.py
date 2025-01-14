@@ -11,9 +11,35 @@ from database import (
     get_meme_statistics,
     get_general_statistics,
     save_message,
+    get_weekly_messages,
 )
 
 bot = TeleBot(BOT_TOKEN)
+
+
+
+
+
+@bot.message_handler(commands=['top'])
+def handle_top_command(message):
+    chat_id = message.chat.id
+    weekly_messages = get_weekly_messages(chat_id)
+    if not weekly_messages:
+        bot.send_message(chat_id, "Нет сообщений за текущую неделю.")
+        return
+    output_file = "weekly_messages.txt"
+    with open(output_file, "w", encoding="utf-8") as f:
+        for idx, (timestamp, username, interaction_type, full_name, message_text, user_id) in enumerate(weekly_messages, start=1):
+            # Форматируем строку
+            formatted_row = f"{idx}. {timestamp}|{username}|{interaction_type}|{full_name}|{message_text}|{user_id}\n"
+            f.write(formatted_row)
+    # Отправляем файл в чат
+    with open(output_file, "rb") as f:
+        bot.send_document(chat_id, f)
+
+
+
+
 
 @bot.message_handler(commands=['stats'])
 def send_statistics(message):
@@ -81,7 +107,4 @@ def format_statistics(chat_id):
         f"Общая статистика\n"
         f"{participants_formatted} | {stories_formatted}"
     )
-
-    return f"```\n{response}\n```"  # Форматирование в стиле Telegram
-
-
+    return f"```\n{response}\n```"  
